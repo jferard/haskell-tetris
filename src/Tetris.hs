@@ -60,21 +60,9 @@ dropBlock rows | gravitate rows /= rows = dropBlock (gravitate rows)
 speedUp :: GridBlock -> GridBlock
 speedUp = gravitate
 
---Moves the moving blocks right
-moveRight :: GridBlock -> GridBlock
-moveRight rows | not(touchright rows) = transpose (gravitate (transpose rows))
-               | otherwise = rows
-        where
-            touchright :: GridBlock -> Bool
-            touchright rows = any moving (mapMaybe last rows)
-
 --Moves the moving blocks left
 moveLeft :: GridBlock -> GridBlock
-moveLeft rows | not(touchleft rows) = map reverse (transpose (gravitate (transpose (map reverse rows))))
-              | otherwise = rows
-        where
-            touchleft :: GridBlock -> Bool
-            touchleft rows = any moving (mapMaybe head rows)
+moveLeft rows = map reverse (moveRight (map reverse rows))
 
 --rotates the moving blocks clockwise
 rotate :: GridBlock -> GridBlock
@@ -152,40 +140,42 @@ gridWidth:: Int
 gridWidth = 10
 
 --Gravitates moving blocks downwards
-gravitate :: GridBlock -> GridBlock
-gravitate rows | not(stopped rows) = transpose (gravitate_columns (transpose rows))
+moveRight :: GridBlock -> GridBlock
+moveRight rows | not(stoppedRight rows) = map moveRight' rows
                | otherwise = rows
     where
-        gravitate_columns :: GridBlock -> GridBlock
-        gravitate_columns = map gravitate_column
-
-        -- no need to gravitate the top of the column if there is no moving shape
-        gravitate_column :: Row Block -> Row Block
-        gravitate_column column =
-            move_blocks top_of_column moving_blocks gap ground
+        moveRight' :: Row Block -> Row Block
+        moveRight' row =
+            move_blocks left_of_row moving_blocks gap border
                 where
-                    -- let's split the column in its interesting parts with span !
-                    (top_of_column, moving_part_of_column) = span (not.movingBlock) column
-                    (moving_blocks, gap_and_ground) = span movingBlock moving_part_of_column
-                    (gap, ground) = span (==Nothing) gap_and_ground
+                    -- let's split the row in its interesting parts with span !
+                    (left_of_row, moving_part_of_row) = span (not.movingBlock) row
+                    (moving_blocks, gap_and_border) = span movingBlock moving_part_of_row
+                    (gap, border) = span (==Nothing) gap_and_border
 
                     move_blocks :: Row Block->Row Block->Row Block->Row Block->Row Block
-                    move_blocks top_of_column moving_blocks (Nothing:gs) ground =
-                        top_of_column ++ [Nothing] ++ moving_blocks ++ gs ++ ground
-                    move_blocks _ _ _ _ = column -- no gap, nothing to move, ...
+                    move_blocks left_of_row moving_blocks (Nothing:gs) border =
+                        left_of_row ++ [Nothing] ++ moving_blocks ++ gs ++ border
+                    move_blocks _ _ _ _ = row -- no gap, nothing to move, ...
 
 --Determines whether the moving blocks have stopped moving
-stopped :: GridBlock -> Bool
-stopped rows = any stopped' columns || empty rows
+stoppedRight :: GridBlock -> Bool
+stoppedRight rows = any stopped' rows || empty rows
     where
-        columns = transpose rows
         couples :: [a] -> [(a, a)]
         couples (x:y:ys) = scanl (\c z -> (snd(c), z)) (x, y) ys
         couples _ = []
         stopped' :: Row Block -> Bool
-        stopped' column | movingBlock (last column) = True
-        stopped' column = any (\(first, second) -> movingBlock first && stationaryBlock second) (couples column)
+        stopped' row | movingBlock (last row) = True
+        stopped' row = any (\(first, second) -> movingBlock first && stationaryBlock second) (couples row)
 
+
+--Gravitates moving blocks downwards
+gravitate :: GridBlock -> GridBlock
+gravitate rows | not(stoppedRight columns) = transpose (moveRight columns)
+               | otherwise = rows
+    where
+        columns = transpose rows
 
 --Determines whether a given block is moving
 movingBlock :: Maybe Block -> Bool
@@ -226,7 +216,7 @@ fullLine = all (/= Nothing)
 
 --Changes moving blocks that have stopped moving to stationary
 freezeBlocks :: GridBlock -> GridBlock
-freezeBlocks rows | stopped rows = map freezeBlocks' rows
+freezeBlocks rows | stoppedRight (transpose rows) = map freezeBlocks' rows
                   | otherwise = rows
             where
                 freezeBlocks' :: Row Block -> Row Block
