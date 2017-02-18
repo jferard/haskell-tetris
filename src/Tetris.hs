@@ -48,7 +48,7 @@ update state = addBlock (gravitate (clearLines (freezeBlocks state)))
 
 --Adds shaped blocks on top of the grid
 addBlock :: GridBlock -> Shape -> GridBlock
-addBlock rows shape | empty rows && not (gameOver rows) = createShape shape ++ tail (tail (tail (tail rows)))
+addBlock rows shape | empty rows && not (gameOver rows) = createShape shape ++ drop 4 rows -- the 4 first rows are invisible
                     | otherwise = rows
 
 --Drops current shape to the bottom
