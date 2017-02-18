@@ -134,7 +134,7 @@ rotate grid = insertRotated' (clearGrid grid) (rotateBlock grid) (map (getBlock 
 
 --Gives the score for current state
 score :: Grid -> Int
-score state = product (replicate 2 (length (filter (==True) (map fullLine state))))
+score state = let num_full_lines = length.filter (==True) (map fullLine state) in num_full_lines*num_full_lines
 
 --Indicates whether the given states results in a game over
 gameOver :: Grid -> Bool
