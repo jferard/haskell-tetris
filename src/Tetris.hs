@@ -153,53 +153,39 @@ gridWidth = 10
 
 --Gravitates moving blocks downwards
 gravitate :: GridBlock -> GridBlock
-gravitate rows | not(stopped rows) = transpose (gravitate_rows (transpose rows))
+gravitate rows | not(stopped rows) = transpose (gravitate_columns (transpose rows))
                | otherwise = rows
     where
-        gravitate_row :: Row Block -> Row Block
-        gravitate_row [] = []
-        gravitate_row row | movingBlock (head row) = move_blocks row
-        gravitate_row (h:t) = h : gravitate_row t
+        gravitate_columns :: GridBlock -> GridBlock
+        gravitate_columns = map gravitate_column
 
-        gravitate_rows :: GridBlock -> GridBlock
-        gravitate_rows [] = []
-        gravitate_rows lis = gravitate_row (head lis) : gravitate_rows (tail lis)
+        -- no need to gravitate the top of the column if there is no moving shape
+        gravitate_column :: Row Block -> Row Block
+        gravitate_column column =
+            move_blocks top_of_column moving_blocks gap ground
+                where
+                    -- let's split the column in its interesting parts with span !
+                    (top_of_column, moving_part_of_column) = span (not.movingBlock) column
+                    (moving_blocks, gap_and_ground) = span movingBlock moving_part_of_column
+                    (gap, ground) = span (==Nothing) gap_and_ground
 
-        --Moves blocks downwards
-        move_blocks :: Row Block -> Row Block
-        move_blocks l | is_gap (gap l) = (Nothing:movingBlocks l) ++ tail (gap l) ++ ground l
-            where
-                is_gap :: Row Block -> Bool
-                is_gap row = not (null (gap row)) && isNothing (head (gap row))
-
-                movingBlocks :: Row Block -> Row Block
-                movingBlocks (h:t) | movingBlock h = h:movingBlocks t
-                movingBlocks _ = []
-
-                gap:: Row Block -> Row Block
-                gap (Nothing:t) = Nothing:gap' t
-                    where
-                        gap' (Nothing:t) = Nothing:gap' t
-                        gap' _ = []
-
-                gap (h:t) | movingBlock h = gap t
-                gap _ = []
-
-                ground :: Row Block -> Row Block
-                ground [] = []
-                ground (h:t) | stationaryBlock h = h:t
-                             | otherwise = ground t
+                    move_blocks :: Row Block->Row Block->Row Block->Row Block->Row Block
+                    move_blocks top_of_column moving_blocks (Nothing:gs) ground =
+                        top_of_column ++ [Nothing] ++ moving_blocks ++ gs ++ ground
+                    move_blocks _ _ _ _ = column -- no gap, nothing to move, ...
 
 --Determines whether the moving blocks have stopped moving
 stopped :: GridBlock -> Bool
 stopped rows = any stopped' columns || empty rows
     where
         columns = transpose rows
+        couples :: [a] -> [(a, a)]
+        couples (x:y:ys) = scanl (\c z -> (snd(c), z)) (x, y) ys
+        couples _ = []
         stopped' :: Row Block -> Bool
-        stopped' [] = False
-        stopped' column | all movingBlock column = True
-        stopped' (first:second:_) | movingBlock first && stationaryBlock second = True
-        stopped' (_:t) = stopped' t
+        stopped' column | movingBlock (last column) = True
+        stopped' column = any (\(first, second) -> movingBlock first && stationaryBlock second) (couples column)
+
 
 --Determines whether a given block is moving
 movingBlock :: Maybe Block -> Bool
@@ -223,7 +209,7 @@ empty rows = all empty' (transpose rows)
 --Clears all full lines from the grid
 clearLines :: GridBlock -> GridBlock
 clearLines rows | empty rows = replicate (missing_rows rows) empty_row ++ remove_lines rows
-                 | otherwise = rows
+                | otherwise = rows
         where
               missing_rows :: GridBlock -> Int
               missing_rows rows = length rows - length (remove_lines rows)
