@@ -62,7 +62,7 @@ playGame = do
                                 drawString gridMiddle
                                 drawLines' (y+1) x (n-1)
                                              | otherwise = return()
-            drawBlocks :: Grid -> Update()
+            drawBlocks :: Grid Block -> Update()
             drawBlocks [] = return ()
             drawBlocks (head:tail) | length (head:tail) <= fromIntegral rows = do
                                         let y = (gridY+rows)- toInteger (length tail)
@@ -70,7 +70,7 @@ playGame = do
                                         drawBlocks tail
                                    | otherwise = drawBlocks tail
                 where
-                    drawLine :: Row -> Integer -> Update()
+                    drawLine :: Row Block -> Integer -> Update()
                     drawLine [] y = return ()
                     drawLine (head:tail) y = do
                             let x = columns-(toInteger (length block)* toInteger (length tail))
@@ -130,7 +130,7 @@ playGame = do
                 drawString "                      "
 
 
-            updateScreen :: Grid -> Int -> StdGen -> Int -> Curses()
+            updateScreen :: Grid Block -> Int -> StdGen -> Int -> Curses()
             updateScreen gameState currentScore gen lvl = do
                 updateWindow w $ do
                     drawBlocks gameState
@@ -163,7 +163,7 @@ playGame = do
                         gen':: StdGen
                         gen' = snd (randomShape gen)
 
-                        state :: Grid
+                        state :: Grid Block
                         state = update gameState nextshape
 
                         newScore :: Int
