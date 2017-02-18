@@ -1,4 +1,5 @@
 module Tetris(
+    fullLine,
     newGame,
     randomShape,
     update,
@@ -228,7 +229,7 @@ clearLines rows | empty rows = replicate (missing_rows rows) empty_row ++ remove
 
 --Determines whether a line is full
 fullLine :: Row -> Bool
-fullLine line = filter (/= Nothing) line == line
+fullLine = all (/= Nothing)
 
 --Changes moving blocks that have stopped moving to stationary
 freezeBlocks :: Grid -> Grid
