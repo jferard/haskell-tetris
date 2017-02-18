@@ -240,12 +240,13 @@ fullLine = all (/= Nothing)
 --Changes moving blocks that have stopped moving to stationary
 freezeBlocks :: GridBlock -> GridBlock
 freezeBlocks rows | stopped rows = map freezeBlocks' rows
-                   | otherwise = rows
+                  | otherwise = rows
             where
                 freezeBlocks' :: Row Block -> Row Block
-                freezeBlocks' [] = []
-                freezeBlocks' (Just (Block s True o):t) = Just (Block s False o): freezeBlocks' t
-                freezeBlocks' b  = head b:freezeBlocks' (tail b)
+                freezeBlocks' = map (fmap freeze) -- fmap freeze :: Maybe Block -> Maybe Block
+                    where
+                        freeze :: Block -> Block
+                        freeze (Block s _ o) = Block s False o
 
 --Creates a grid containing a given shape to put on top of a game grid
 createShape :: Shape -> GridBlock
