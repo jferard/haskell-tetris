@@ -244,91 +244,72 @@ freezeBlocks rows | stopped rows = map freezeBlocks' rows
             where
                 freezeBlocks' :: Row Block -> Row Block
                 freezeBlocks' = map (fmap freeze) -- fmap freeze :: Maybe Block -> Maybe Block
-                    where
-                        freeze :: Block -> Block
-                        freeze (Block s _ o) = Block s False o
+                freeze :: Block -> Block
+                freeze (Block s _ o) = Block s False o
 
 --Creates a grid containing a given shape to put on top of a game grid
 createShape :: Shape -> GridBlock
-createShape sh | sh == I = pad createI
-               | sh == J = pad createJ
-               | sh == L = pad createL
-               | sh == S = pad createS
-               | sh == Z = pad createZ
-               | sh == O = pad createO
-               | sh == T = pad createT
+createShape sh = pad (create sh)
         where
-              block shape origin = Just (Block shape True origin)
               x = Nothing
-              hpad l = replicate 3 x ++ l ++ replicate 4 x
+              pad :: [[Maybe Block]] -> [[Maybe Block]]
+              pad s | length s == 2 = blank_row : (hpadded ++ [blank_row])
+                    | length s == 3 = blank_row : hpadded
+                    | otherwise = hpadded
+                        where
+                            hpadded = map (hpad w) s
+                            w = (length.head) s
+                            blank_row = replicate gridWidth x
+              hpad :: Int -> [Maybe Block] -> [Maybe Block]
+              hpad w l = replicate before_count x ++ l ++ replicate after_count x
+                        where
+                            before_count::Int
+                            before_count = (gridWidth - w) `div` 2
+                            after_count::Int
+                            after_count = gridWidth - w - before_count
 
-              pad s | length s == 2 = [replicate 10 x] ++ map hpad s ++ [replicate 10 x]
-                    | length s == 3 = replicate 10 x : map hpad s
-                    | otherwise = map hpad s
-
-              createI =
+              create :: Shape -> [[Maybe Block]]
+              create sh = case sh of
+                I ->
                     [
                         [x,b,x],
                         [x,o,x],
                         [x,b,x],
                         [x,b,x]
                     ]
-                    where
-                        b = block I False
-                        o = block I True
-
-              createJ =
+                J ->
                     [
                         [x,b,x],
                         [x,o,x],
                         [b,b,x]
                     ]
-                    where
-                        b = block J False
-                        o = block J True
-
-              createL =
+                L ->
                     [
                         [x,b,x],
                         [x,o,x],
                         [x,b,b]
                     ]
-                    where
-                        b = block L False
-                        o = block L True
-
-              createS =
+                S ->
                     [
                         [x,b,b],
                         [b,o,x]
                     ]
-                    where
-                        b = block S False
-                        o = block S True
-
-              createZ =
+                Z ->
                     [
                         [b,b,x],
                         [x,o,b]
                     ]
-                    where
-                        b = block Z False
-                        o = block Z True
-
-              createO =
+                O ->
                     [
                         [x,b,b],
                         [x,b,b]
                     ]
-                    where
-                        b = block O False
-                        o = block O True
-              createT = 
+                T ->
                     [
                         [b,o,b],
                         [x,b,x]
                     ]
-                    where
-                        b = block T False
-                        o = block T True
+                where
+                    b = Just (Block sh True False)
+                    o = Just (Block sh True True)
 
