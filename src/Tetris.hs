@@ -139,8 +139,9 @@ score :: Eq a => Grid a -> Int
 score state = let num_full_lines = length (filter (==True) (map fullLine state)) in num_full_lines*num_full_lines
 
 --Indicates whether the given states results in a game over
+-- One of the first rows has a Just Block that is stationary
 gameOver :: GridBlock -> Bool
-gameOver state = any (not . all moving . catMaybes) (take 4 state)
+gameOver state = any (any stationaryBlock) (take 4 state)
 
 ---Helpers
 
