@@ -33,13 +33,34 @@ type Grid a = [Row a]
 
 type GridBlock = Grid Block
 
+---Helpers
+
+gridHeight :: Int
+gridHeight = 26
+
+gridWidth:: Int
+gridWidth = 10
+
+
 --Returns an empty Tetris grid
 newGame :: GridBlock
 newGame = replicate gridHeight (replicate gridWidth Nothing)
 
 --Returns a tuple containing a random shape and a generator
 randomShape :: RandomGen g => g -> (Shape, g)
-randomShape g = case randomR (0,length [J ..]-1) g of (r, g') -> (toEnum r, g')
+randomShape g = let (r, g') = randomR (0,length [J ..]-1) g in (toEnum r, g')
+
+-- a (infinite) list of random shapes
+randomShapes gen = let (s, gen') = randomShape gen in s:randomShapes gen'
+
+--Gives the score for current state
+score :: Eq a => Grid a -> Int
+score state = let num_full_lines = length (filter (==True) (map fullLine state)) in num_full_lines*num_full_lines
+
+--Indicates whether the given states results in a game over
+-- One of the first rows has a Just Block that is stationary
+gameOver :: GridBlock -> Bool
+gameOver state = any (any stationaryBlock) (take 4 state)
 
 --Updates the state of a Tetris grid by gravitating, clearing lines and
 --stopping blocks
@@ -55,14 +76,6 @@ addBlock rows shape | empty rows && not (gameOver rows) = createShape shape ++ d
 dropBlock :: GridBlock -> GridBlock
 dropBlock rows | gravitate rows /= rows = dropBlock (gravitate rows)
                | otherwise = rows
-
---Speeds up the gravity
-speedUp :: GridBlock -> GridBlock
-speedUp = gravitate
-
---Moves the moving blocks left
-moveLeft :: GridBlock -> GridBlock
-moveLeft rows = map reverse (moveRight (map reverse rows))
 
 --rotates the moving blocks clockwise
 rotate :: GridBlock -> GridBlock
@@ -122,22 +135,14 @@ rotate grid = insertRotated' (clearGrid grid) (rotateBlock grid) (map (getBlock 
                 setBlock' :: Row Block -> Int -> Maybe Block -> Row Block
                 setBlock' row y val = fst (splitAt y row) ++ val:tail(snd (splitAt y row))
 
---Gives the score for current state
-score :: Eq a => Grid a -> Int
-score state = let num_full_lines = length (filter (==True) (map fullLine state)) in num_full_lines*num_full_lines
+--Speeds up the gravity
+speedUp :: GridBlock -> GridBlock
+speedUp = gravitate
 
---Indicates whether the given states results in a game over
--- One of the first rows has a Just Block that is stationary
-gameOver :: GridBlock -> Bool
-gameOver state = any (any stationaryBlock) (take 4 state)
+--Moves the moving blocks left
+moveLeft :: GridBlock -> GridBlock
+moveLeft rows = map reverse (moveRight (map reverse rows))
 
----Helpers
-
-gridHeight :: Int
-gridHeight = 26
-
-gridWidth:: Int
-gridWidth = 10
 
 --Gravitates moving blocks downwards
 moveRight :: GridBlock -> GridBlock
