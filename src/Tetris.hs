@@ -8,7 +8,8 @@ module Tetris(
     speedUp,
     moveRight,
     moveLeft,
-    rotate,
+    rotateBlocksLeft,
+    rotateBlocksRight,
     score,
     gameOver,
     GridBlock,
@@ -23,6 +24,7 @@ import Data.Maybe
 import System.Random
 import Debug.Trace
 import Grid
+import Rotation
 
 data Shape = J | L | I | S | Z | O | T
             deriving (Eq, Show, Enum)
@@ -80,9 +82,17 @@ dropBlock :: GridBlock -> GridBlock
 dropBlock rows | gravitate rows /= rows = dropBlock (gravitate rows)
                | otherwise = rows
 
+--rotates the moving blocks counterclockwise
+rotateBlocksLeft :: GridBlock -> GridBlock
+rotateBlocksLeft = rotateBlocks rotateLeft
+
+--rotates the moving blocks counterclockwise
+rotateBlocksRight :: GridBlock -> GridBlock
+rotateBlocksRight = rotateBlocks rotateRight
+
 --rotates the moving blocks clockwise
-rotate :: GridBlock -> GridBlock
-rotate grid = case setCellsInGrid (clearMovingFromGrid grid) (coordsAfterMovingRotation grid) movingBlocks of
+rotateBlocks :: ((Point Int) -> (Point Int) -> (Point Int)) -> GridBlock -> GridBlock
+rotateBlocks rotate grid = case setCellsInGrid (clearMovingFromGrid grid) (coordsAfterMovingRotation grid) movingBlocks of
                     Left _ -> trace ("rotation out of field!") grid
                     Right g -> g
     where
@@ -99,10 +109,7 @@ rotate grid = case setCellsInGrid (clearMovingFromGrid grid) (coordsAfterMovingR
                 (origin:_) | all unoccupied targetCoordinates -> targetCoordinates
                     where
                         targetCoordinates :: [(Int, Int)]
-                        targetCoordinates = map (rotatePoint origin) (movingCoordinates grid)
-
-                        rotatePoint::(Int,Int) -> (Int,Int) -> (Int,Int)
-                        rotatePoint (originr, originc) (r, c) = (originr + originc - c, originc - originr + r)
+                        targetCoordinates = map (rotate origin) (movingCoordinates grid)
 
                         unoccupied::(Int,Int) -> Bool
                         unoccupied (r, c) = case getCellInGrid grid r c of

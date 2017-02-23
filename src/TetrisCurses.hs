@@ -80,8 +80,10 @@ updateScreen w colors gameState currentScore gen lvl = do
                 -> updateScreen w colors (moveRight state) newScore gen' lvl
             | ev' == EventSpecialKey KeyDownArrow
                 -> updateScreen w colors (speedUp state) newScore gen' lvl
-            | ev' == EventSpecialKey KeyUpArrow
-                -> updateScreen w colors (rotate state) newScore gen' lvl
+            | ev' == EventCharacter 'w'
+                -> updateScreen w colors (rotateBlocksLeft state) newScore gen' lvl
+            | ev' == EventCharacter 'x'
+                -> updateScreen w colors (rotateBlocksRight state) newScore gen' lvl
             | ev' == EventCharacter ' '
                 -> updateScreen w colors (dropBlock state) newScore gen' lvl
             | ev' == EventCharacter 'r'
