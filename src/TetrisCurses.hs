@@ -61,7 +61,7 @@ game w colors g = do
         Just _ -> game w colors g
 
 
-updateScreen :: Window -> Colors -> Grid Block -> Int -> StdGen -> Int -> Curses()
+updateScreen :: Window -> Colors -> GridBlock -> Int -> StdGen -> Int -> Curses()
 updateScreen w colors gameState currentScore gen lvl = do
     updateWindow w $ do
         drawBlocks colors gameState
@@ -94,7 +94,7 @@ updateScreen w colors gameState currentScore gen lvl = do
             gen':: StdGen
             gen' = snd (randomShape gen)
 
-            state :: Grid Block
+            state :: GridBlock
             state = update gameState nextshape
 
             newScore :: Int
@@ -129,7 +129,7 @@ drawGrid y x c = do
                                  | otherwise = return()
 
 
-drawBlocks :: Colors -> Grid Block -> Update()
+drawBlocks :: Colors -> GridBlock -> Update()
 drawBlocks _ [] = return ()
 drawBlocks colors (head:tail) | length (head:tail) <= fromIntegral rows = do
                             let y = (gridY+rows)- toInteger (length tail)
@@ -137,7 +137,7 @@ drawBlocks colors (head:tail) | length (head:tail) <= fromIntegral rows = do
                             drawBlocks colors tail
                        | otherwise = drawBlocks colors tail
     where
-        drawLine :: Row Block -> Integer -> Update()
+        drawLine :: RowBlock -> Integer -> Update()
         drawLine [] y = return ()
         drawLine (head:tail) y = do
                 let x = columns-(toInteger (length block)* toInteger (length tail))

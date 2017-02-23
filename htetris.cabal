@@ -22,9 +22,10 @@ executable htetris
 
 Test-Suite test-htetris
   type:               exitcode-stdio-1.0
-  main-is:            TestTetris.hs
+  main-is:            TestGrid.hs
   hs-source-dirs:     test, src
   build-depends:      base, ncurses, random,
                       test-framework,
                       test-framework-hunit,
                       HUnit
+  default-language:    Haskell2010

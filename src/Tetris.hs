@@ -3,7 +3,7 @@ module Tetris(
     newGame,
     randomShape,
     update,
-    addBlock,
+    addTetromino,
     dropBlock,
     speedUp,
     moveRight,
@@ -11,27 +11,30 @@ module Tetris(
     rotate,
     score,
     gameOver,
-    Grid,
-    Row,
+    GridBlock,
+    RowBlock,
     Block(..),
     Shape(..)
 ) where
 
 import Data.List
+import Data.Either
 import Data.Maybe
 import System.Random
+import Debug.Trace
+import Grid
 
 data Shape = J | L | I | S | Z | O | T
             deriving (Eq, Show, Enum)
 
+-- a block is defined by the shape it belongs to, whether it is moving or not and whether it is the origin of the shape or not
 data Block = Block { shape :: Shape, moving::Bool, origin::Bool}
             deriving (Eq, Show)
 
-type Row a  = [Maybe a]
+type GridBlock = Grid (Maybe Block)
+type RowBlock = Row (Maybe Block)
 
-type Grid a = [Row a]
-
-type GridBlock = Grid Block
+type Tetromino = Grid (Maybe Block)
 
 ---Helpers
 
@@ -54,7 +57,7 @@ randomShape g = let (r, g') = randomR (0,length [J ..]-1) g in (toEnum r, g')
 randomShapes gen = let (s, gen') = randomShape gen in s:randomShapes gen'
 
 --Gives the score for current state
-score :: Eq a => Grid a -> Int
+score :: Eq a => Grid (Maybe a) -> Int
 score state = let num_full_lines = length (filter (==True) (map fullLine state)) in num_full_lines*num_full_lines
 
 --Indicates whether the given states results in a game over
@@ -65,11 +68,11 @@ gameOver state = any (any stationaryBlock) (take 4 state)
 --Updates the state of a Tetris grid by gravitating, clearing lines and
 --stopping blocks
 update :: GridBlock -> Shape -> GridBlock
-update state = addBlock (gravitate (clearLines (freezeBlocks state)))
+update state = addTetromino (gravitate (clearLines (freezeBlocks state)))
 
 --Adds shaped blocks on top of the grid
-addBlock :: GridBlock -> Shape -> GridBlock
-addBlock rows shape | empty rows && not (gameOver rows) = createShape shape ++ drop 4 rows -- the 4 first rows are invisible
+addTetromino :: GridBlock -> Shape -> GridBlock
+addTetromino rows shape | empty rows && not (gameOver rows) = createTetromino shape ++ drop 4 rows -- the 4 first rows are invisible
                     | otherwise = rows
 
 --Drops current shape to the bottom
@@ -79,61 +82,57 @@ dropBlock rows | gravitate rows /= rows = dropBlock (gravitate rows)
 
 --rotates the moving blocks clockwise
 rotate :: GridBlock -> GridBlock
-rotate grid = insertRotated' (clearGrid grid) (rotateBlock grid) (map (getBlock grid) (movingCoordinates grid))
+rotate grid = case setCellsInGrid (clearMovingFromGrid grid) (coordsAfterMovingRotation grid) movingBlocks of
+                    Left _ -> trace ("rotation out of field!") grid
+                    Right g -> g
     where
-        insertRotated':: GridBlock -> [(Int,Int)] -> [Maybe Block] -> GridBlock
-        insertRotated' grid [] _ = grid
-        insertRotated' grid (h:t) (val:valt) = insertRotated' (setBlock grid h val) t valt
+        -- first step: remove all moving blocks from grid
+        clearMovingFromGrid :: GridBlock -> GridBlock
+        clearMovingFromGrid grid = case clearCells grid (movingCoordinates grid) of
+            Left _ -> trace ("this can't happen!") grid
+            Right g -> g
 
-        clearGrid :: GridBlock -> GridBlock
-        clearGrid grid = clearGrid' grid (movingCoordinates grid)
+        -- second step: get all moving coordinates after rotation around the origin
+        coordsAfterMovingRotation :: GridBlock -> [(Int,Int)]
+        coordsAfterMovingRotation grid =
+            case origins of
+                (origin:_) | all unoccupied targetCoordinates -> targetCoordinates
+                    where
+                        targetCoordinates :: [(Int, Int)]
+                        targetCoordinates = map (rotatePoint origin) (movingCoordinates grid)
+
+                        rotatePoint::(Int,Int) -> (Int,Int) -> (Int,Int)
+                        rotatePoint (originr, originc) (r, c) = (originr + originc - c, originc - originr + r)
+
+                        unoccupied::(Int,Int) -> Bool
+                        unoccupied (r, c) = case getCellInGrid grid r c of
+                            Right b -> not (stationaryBlock b)
+                            _ -> False
+
+                _ -> trace ("no origin!!") (movingCoordinates grid)
             where
-                clearGrid' :: GridBlock -> [(Int,Int)] -> GridBlock
-                clearGrid' = foldl (\ grid h -> setBlock grid h Nothing)
+                origins:: [(Int,Int)]
+                origins = filter isOrigin (movingCoordinates grid)
 
+                isOrigin::(Int,Int) -> Bool
+                isOrigin (r, c) = case getCellInGrid grid r c of
+                    Right (Just Block{ origin = True }) -> True
+                    _ -> False
+
+
+        -- third step: get the list of moving blocks
+        movingBlocks::[Maybe Block]
+        movingBlocks = rights eitherMovingBlocks
+            where
+                eitherMovingBlocks :: [Either String (Maybe Block)]
+                eitherMovingBlocks = map (uncurry(getCellInGrid grid)) (movingCoordinates grid)
+
+        -- get a list of moving block coordinates, (r, c)
         movingCoordinates :: GridBlock -> [(Int,Int)]
-        movingCoordinates [] = []
-        movingCoordinates (h:t) = movingCoordinates' h (25 - length t)  ++ movingCoordinates t
+        movingCoordinates = fst . (foldl (\ (acc, r) row -> (acc ++ movingCoordinatesInRow r row, r+1)) ([], 0))
             where
-                movingCoordinates' :: Row Block -> Int -> [(Int,Int)]
-                movingCoordinates' [] _ = []
-                movingCoordinates' (h:t) y | movingBlock h = (y,9- length t):movingCoordinates' t y
-                                        | otherwise = movingCoordinates' t y
-
-        getOrigin::GridBlock -> (Int,Int)
-        getOrigin grid = head (origins grid)
-
-        isOrigin:: GridBlock -> (Int,Int) -> Bool
-        isOrigin grid (x,y) = isJust (getBlock grid (x,y)) && origin (fromJust (getBlock grid (x,y)))
-
-        origins:: GridBlock -> [(Int,Int)]
-        origins grid = filter (isOrigin grid) (movingCoordinates grid)
-
-        rotateBlock:: GridBlock -> [(Int,Int)]
-        rotateBlock grid | hasOrigin grid 
-                        && all (unoccupied grid) (map (rotatePoint (getOrigin grid)) (movingCoordinates grid))
-                        = map (rotatePoint (getOrigin grid)) (movingCoordinates grid)
-                         | otherwise = movingCoordinates grid
-
-        rotatePoint::(Int,Int) -> (Int,Int) -> (Int,Int)
-        rotatePoint (originx,originy) (x,y) = (originx + originy - y, originy - originx + x)
-
-        hasOrigin::Grid Block -> Bool
-        hasOrigin grid = not (null (origins grid))
-
-        unoccupied::Grid Block-> (Int,Int) -> Bool
-        unoccupied grid (x,y) = (x > 0 && x < gridHeight && y > 0 && y < gridWidth) 
-                     && not (stationaryBlock (getBlock grid (x,y)))
-
-        getBlock :: Grid Block -> (Int,Int) -> Maybe Block
-        getBlock grid (x,y) = (grid !! x) !! y
-
-        setBlock :: Grid Block -> (Int,Int) -> Maybe Block -> Grid Block
-        setBlock grid (x,y) val =
-                fst (splitAt x grid) ++ setBlock' (head (snd(splitAt x grid))) y val:tail(snd (splitAt x grid))
-            where
-                setBlock' :: Row Block -> Int -> Maybe Block -> Row Block
-                setBlock' row y val = fst (splitAt y row) ++ val:tail(snd (splitAt y row))
+                movingCoordinatesInRow :: Int -> RowBlock -> [(Int,Int)]
+                movingCoordinatesInRow r = fst . (foldl (\ (acc, c) b -> (if movingBlock b then acc ++ [(r, c)] else acc, c+1)) ([], 0))
 
 --Speeds up the gravity
 speedUp :: GridBlock -> GridBlock
@@ -149,7 +148,7 @@ moveRight :: GridBlock -> GridBlock
 moveRight rows | not(stoppedRight rows) = map moveRight' rows
                | otherwise = rows
     where
-        moveRight' :: Row Block -> Row Block
+        moveRight' :: RowBlock -> RowBlock
         moveRight' row =
             move_blocks left_of_row moving_blocks gap border
                 where
@@ -158,7 +157,7 @@ moveRight rows | not(stoppedRight rows) = map moveRight' rows
                     (moving_blocks, gap_and_border) = span movingBlock moving_part_of_row
                     (gap, border) = span (==Nothing) gap_and_border
 
-                    move_blocks :: Row Block->Row Block->Row Block->Row Block->Row Block
+                    move_blocks :: RowBlock -> RowBlock -> RowBlock -> RowBlock -> RowBlock
                     move_blocks left_of_row moving_blocks (Nothing:gs) border =
                         left_of_row ++ [Nothing] ++ moving_blocks ++ gs ++ border
                     move_blocks _ _ _ _ = row -- no gap, nothing to move, ...
@@ -170,7 +169,7 @@ stoppedRight rows = any stopped' rows || empty rows
         couples :: [a] -> [(a, a)]
         couples (x:y:ys) = scanl (\c z -> (snd(c), z)) (x, y) ys
         couples _ = []
-        stopped' :: Row Block -> Bool
+        stopped' :: RowBlock -> Bool
         stopped' row | movingBlock (last row) = True
         stopped' row = any (\(first, second) -> movingBlock first && stationaryBlock second) (couples row)
 
@@ -197,41 +196,37 @@ stationaryBlock _ = False
 empty :: GridBlock -> Bool
 empty rows = all empty' (transpose rows)
     where
-        empty' :: Row Block -> Bool
+        empty' :: RowBlock -> Bool
         empty' l | not (any moving (catMaybes l)) = True
         empty' l = False
 
 --Clears all full lines from the grid
 clearLines :: GridBlock -> GridBlock
-clearLines rows | empty rows = replicate (missing_rows rows) empty_row ++ remove_lines rows
+clearLines rows | empty rows = replicate (missing_rows rows) (replicate gridWidth Nothing) ++ remove_lines rows
                 | otherwise = rows
         where
               missing_rows :: GridBlock -> Int
               missing_rows rows = length rows - length (remove_lines rows)
 
-              empty_row :: Row Block
-              empty_row = replicate 10 Nothing
+              empty_row :: RowBlock
+              empty_row = replicate gridWidth Nothing
 
               remove_lines :: GridBlock -> GridBlock
               remove_lines = filter (not . fullLine)
-
---Determines whether a line is full
-fullLine :: Eq a => Row a -> Bool
-fullLine = all (/= Nothing)
 
 --Changes moving blocks that have stopped moving to stationary
 freezeBlocks :: GridBlock -> GridBlock
 freezeBlocks rows | stoppedRight (transpose rows) = map freezeBlocks' rows
                   | otherwise = rows
             where
-                freezeBlocks' :: Row Block -> Row Block
+                freezeBlocks' :: RowBlock -> RowBlock
                 freezeBlocks' = map (fmap freeze) -- fmap freeze :: Maybe Block -> Maybe Block
                 freeze :: Block -> Block
                 freeze (Block s _ o) = Block s False o
 
 --Creates a grid containing a given shape to put on top of a game grid
-createShape :: Shape -> GridBlock
-createShape sh = pad (create sh)
+createTetromino :: Shape -> Tetromino
+createTetromino sh = pad (create sh)
         where
               x = Nothing
               pad :: [[Maybe Block]] -> [[Maybe Block]]
